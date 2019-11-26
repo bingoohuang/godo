@@ -32,21 +32,7 @@ func (a *App) ParseFlags() {
 
 	flag.Parse()
 
-	var err error
-
-	if strings.Contains(*span, "-") {
-		pos := strings.Index(*span, "-")
-
-		if a.startSpan, err = time.ParseDuration((*span)[:pos]); err != nil {
-			panic(err)
-		}
-
-		if a.endSpan, err = time.ParseDuration((*span)[pos+1:]); err != nil {
-			panic(err)
-		}
-	} else if a.startSpan, err = time.ParseDuration(*span); err != nil {
-		panic(err)
-	}
+	a.parseSpan(*span)
 
 	a.nums = ExpandRange(*nums)
 	a.numsLen = uint64(len(a.nums))
@@ -57,6 +43,24 @@ func (a *App) ParseFlags() {
 
 	if a.shell == "" {
 		logrus.Fatal("shell required")
+	}
+}
+
+func (a *App) parseSpan(span string) {
+	var err error
+
+	if strings.Contains(span, "-") {
+		pos := strings.Index(span, "-")
+
+		if a.startSpan, err = time.ParseDuration((span)[:pos]); err != nil {
+			panic(err)
+		}
+
+		if a.endSpan, err = time.ParseDuration((span)[pos+1:]); err != nil {
+			panic(err)
+		}
+	} else if a.startSpan, err = time.ParseDuration(span); err != nil {
+		panic(err)
 	}
 }
 
