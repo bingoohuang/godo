@@ -12,56 +12,68 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func main() {
-	span := ""
-	nums := ""
-	shell := ""
-	setup := ""
+// App structures the godo application.
+type App struct {
+	startSpan time.Duration
+	endSpan   time.Duration
+	nums      []string
+	shell     string
+	setup     string
+	numsLen   uint64
+}
 
-	flag.StringVar(&setup, "setup", "100", "setup num")
-	flag.StringVar(&span, "span", "10m", "time span to do sth, eg. 1h, 10m")
-	flag.StringVar(&nums, "nums", "1", "numbers range, eg 1-3")
-	flag.StringVar(&shell, "shell", "", "shell to invoke")
+// ParseFlags parses the command line arguments.
+func (a *App) ParseFlags() {
+	flag.StringVar(&a.setup, "setup", "", "setup num")
+	span := flag.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
+		"or 10s-1m for rand span among the range")
+	nums := flag.String("nums", "1", "numbers range, eg 1-3")
+	flag.StringVar(&a.shell, "shell", "", "shell to invoke")
 
 	flag.Parse()
 
-	spanDuration, err := time.ParseDuration(span)
-	if err != nil {
+	var err error
+
+	if strings.Contains(*span, "-") {
+		pos := strings.Index(*span, "-")
+
+		if a.startSpan, err = time.ParseDuration((*span)[:pos]); err != nil {
+			panic(err)
+		}
+
+		if a.endSpan, err = time.ParseDuration((*span)[pos+1:]); err != nil {
+			panic(err)
+		}
+	} else if a.startSpan, err = time.ParseDuration(*span); err != nil {
 		panic(err)
 	}
 
-	expandNums := ExpandRange(nums)
-	expandNumsLen := uint64(len(expandNums))
+	a.nums = ExpandRange(*nums)
+	a.numsLen = uint64(len(a.nums))
 
-	if expandNumsLen == 0 {
+	if a.numsLen == 0 {
 		logrus.Fatal("nums", nums, "is illegal")
 	}
 
-	if shell == "" {
+	if a.shell == "" {
 		logrus.Fatal("shell required")
-	}
-
-	if setup != "" {
-		logrus.Infof("start to setup sth")
-
-		do(shell, setup)
-
-		logrus.Infof("complete to setup sth")
-	}
-
-	for {
-		logrus.Infof("start to do sth")
-
-		randNum := expandNums[ran.IntN(expandNumsLen)]
-
-		do(shell, randNum)
-
-		logrus.Infof("start to sleep %s", span)
-		time.Sleep(spanDuration)
 	}
 }
 
-func do(shell string, randNum string) {
+// SetupJob setup job before looping.
+func (a *App) SetupJob() {
+	if a.setup == "" {
+		logrus.Infof("nothing to setup")
+	}
+
+	logrus.Infof("start to setup sth")
+
+	a.executeShell(a.shell, a.setup)
+
+	logrus.Infof("complete to setup sth")
+}
+
+func (a *App) executeShell(shell, randNum string) {
 	cmd := exec.Command("sh", "-c", shell)
 	cmd.Env = []string{"GODO_NUM=" + randNum}
 	cmd.Stdout = os.Stdout
@@ -70,6 +82,37 @@ func do(shell string, randNum string) {
 	if err := cmd.Run(); err != nil {
 		logrus.Errorf("cmd.Run %s failed with %s\n", shell, err)
 	}
+}
+
+// LoopJob loop job in an infinite loop.
+func (a *App) LoopJob() {
+	for {
+		logrus.Infof("start to do sth")
+
+		randNum := a.nums[ran.IntN(a.numsLen)]
+
+		go a.executeShell(a.shell, randNum)
+
+		span := a.randSpan()
+		logrus.Infof("start to sleep %s", span)
+		time.Sleep(span)
+	}
+}
+
+func (a *App) randSpan() time.Duration {
+	if a.endSpan == 0 {
+		return a.startSpan
+	}
+
+	return a.startSpan + time.Duration(ran.IntN(uint64(a.endSpan-a.startSpan)))
+}
+
+func main() {
+	var app App
+
+	app.ParseFlags()
+	app.SetupJob()
+	app.LoopJob()
 }
 
 // ExpandRange expands a string like 1-3 to [1,2,3]
