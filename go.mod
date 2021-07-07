@@ -2,4 +2,4 @@ module github.com/bingoohuang/godo
 
 go 1.13
 
-require github.com/bingoohuang/gou v0.0.0-20200427104110-9b847a792b6b
+require github.com/bingoohuang/gg v0.0.0-20210701041010-ef1cf76a32ef

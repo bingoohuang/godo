@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bingoohuang/gou/ran"
+	"github.com/bingoohuang/gg/pkg/randx"
 )
 
 func main() {
@@ -76,12 +76,11 @@ func (a *App) parseSpan(span string) {
 func (a *App) SetupJob() {
 	if a.setup == "" {
 		log.Printf("nothing to setup")
+		return
 	}
 
 	log.Printf("start to setup sth")
-
 	a.executeShell(a.shell, a.setup)
-
 	log.Printf("complete to setup sth")
 }
 
@@ -100,14 +99,8 @@ func (a *App) executeShell(shell, randNum string) {
 func (a *App) LoopJob() {
 	for {
 		log.Printf("start to do sth")
-
-		randNum := a.nums[ran.IntN(a.numsLen)]
-
-		go a.executeShell(a.shell, randNum)
-
-		span := a.randSpan()
-		log.Printf("start to sleep %s", span)
-		time.Sleep(span)
+		go a.executeShell(a.shell, a.nums[randx.IntN(int(a.numsLen))])
+		time.Sleep(a.randSpan())
 	}
 }
 
@@ -116,7 +109,7 @@ func (a *App) randSpan() time.Duration {
 		return a.startSpan
 	}
 
-	return a.startSpan + time.Duration(ran.IntN(uint64(a.endSpan-a.startSpan)))
+	return a.startSpan + time.Duration(randx.Uint64N(int64(a.endSpan-a.startSpan)))
 }
 
 // ExpandRange expands a string like 1-3 to [1,2,3]

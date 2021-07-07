@@ -42,3 +42,16 @@ call demo.sh :
 ```bash
 nohup godo -shell ./demo.sh -setup 0  -span 10s-1m -nums 1-5  2>&1 >> godo.out &
 ```
+
+
+
+```sh
+$ godo -span 1m -shell "ps aux|awk 'NR == 1 || \$2==27535'"
+2021/07/07 16:03:38 nothing to setup
+2021/07/07 16:03:38 start to do sth
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root     27535 58.9 10.8 2191460 864160 pts/1  Sl   14:43  47:15 beefs server -dir=/home/beefs/data -volume.max=80
+2021/07/07 16:04:38 start to do sth
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root     27535 60.0 12.9 2191460 1030644 pts/1 Sl   14:43  48:42 beefs server -dir=/home/beefs/data -volume.max=80
+```
