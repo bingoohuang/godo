@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -9,8 +10,15 @@ import (
 	"time"
 
 	"github.com/bingoohuang/gou/ran"
-	"github.com/sirupsen/logrus"
 )
+
+func main() {
+	var app App
+
+	app.ParseFlags()
+	app.SetupJob()
+	app.LoopJob()
+}
 
 // App structures the godo application.
 type App struct {
@@ -38,11 +46,11 @@ func (a *App) ParseFlags() {
 	a.numsLen = uint64(len(a.nums))
 
 	if a.numsLen == 0 {
-		logrus.Fatal("nums", nums, "is illegal")
+		log.Fatal("nums", nums, "is illegal")
 	}
 
 	if a.shell == "" {
-		logrus.Fatal("shell required")
+		log.Fatal("shell required")
 	}
 }
 
@@ -67,14 +75,14 @@ func (a *App) parseSpan(span string) {
 // SetupJob setup job before looping.
 func (a *App) SetupJob() {
 	if a.setup == "" {
-		logrus.Infof("nothing to setup")
+		log.Printf("nothing to setup")
 	}
 
-	logrus.Infof("start to setup sth")
+	log.Printf("start to setup sth")
 
 	a.executeShell(a.shell, a.setup)
 
-	logrus.Infof("complete to setup sth")
+	log.Printf("complete to setup sth")
 }
 
 func (a *App) executeShell(shell, randNum string) {
@@ -84,21 +92,21 @@ func (a *App) executeShell(shell, randNum string) {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("cmd.Run %s failed with %s\n", shell, err)
+		log.Printf("cmd.Run %s failed with %s", shell, err)
 	}
 }
 
 // LoopJob loop job in an infinite loop.
 func (a *App) LoopJob() {
 	for {
-		logrus.Infof("start to do sth")
+		log.Printf("start to do sth")
 
 		randNum := a.nums[ran.IntN(a.numsLen)]
 
 		go a.executeShell(a.shell, randNum)
 
 		span := a.randSpan()
-		logrus.Infof("start to sleep %s", span)
+		log.Printf("start to sleep %s", span)
 		time.Sleep(span)
 	}
 }
@@ -109,14 +117,6 @@ func (a *App) randSpan() time.Duration {
 	}
 
 	return a.startSpan + time.Duration(ran.IntN(uint64(a.endSpan-a.startSpan)))
-}
-
-func main() {
-	var app App
-
-	app.ParseFlags()
-	app.SetupJob()
-	app.LoopJob()
 }
 
 // ExpandRange expands a string like 1-3 to [1,2,3]
