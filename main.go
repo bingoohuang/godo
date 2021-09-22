@@ -1,37 +1,50 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"github.com/bingoohuang/gg/pkg/randx"
+	"github.com/bingoohuang/gg/pkg/thinktime"
 	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/bingoohuang/gg/pkg/randx"
 )
 
 func main() {
+	log.SetOutput(os.Stdout)
+
 	var app App
 
 	app.ParseFlags()
+
+	data, err := os.ReadFile(app.shell)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if bytes.HasPrefix(data, []byte("###")) {
+		executeJobShell(string(data))
+		return
+	}
+
 	app.SetupJob()
 	app.LoopJob()
 }
 
 // App structures the godo application.
 type App struct {
-	startSpan time.Duration
-	endSpan   time.Duration
-	nums      []string
-	shell     string
-	setup     string
-	numsLen   uint64
+	think   *thinktime.ThinkTime
+	nums    []string
+	shell   string
+	setup   string
+	numsLen uint64
 }
 
 // ParseFlags parses the command line arguments.
 func (a *App) ParseFlags() {
+
 	flag.StringVar(&a.setup, "setup", "", "setup num")
 	span := flag.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
 		"or 10s-1m for rand span among the range")
@@ -52,23 +65,14 @@ func (a *App) ParseFlags() {
 	if a.shell == "" {
 		log.Fatal("shell required")
 	}
+
 }
 
 func (a *App) parseSpan(span string) {
 	var err error
-
-	if strings.Contains(span, "-") {
-		pos := strings.Index(span, "-")
-
-		if a.startSpan, err = time.ParseDuration((span)[:pos]); err != nil {
-			panic(err)
-		}
-
-		if a.endSpan, err = time.ParseDuration((span)[pos+1:]); err != nil {
-			panic(err)
-		}
-	} else if a.startSpan, err = time.ParseDuration(span); err != nil {
-		panic(err)
+	a.think, err = thinktime.ParseThinkTime(span)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -100,16 +104,14 @@ func (a *App) LoopJob() {
 	for {
 		log.Printf("start to do sth")
 		go a.executeShell(a.shell, a.nums[randx.IntN(int(a.numsLen))])
-		time.Sleep(a.randSpan())
+		a.randSpan()
 	}
 }
 
-func (a *App) randSpan() time.Duration {
-	if a.endSpan == 0 {
-		return a.startSpan
+func (a *App) randSpan() {
+	if a.think != nil {
+		a.think.Think(true)
 	}
-
-	return a.startSpan + time.Duration(randx.Uint64N(int64(a.endSpan-a.startSpan)))
 }
 
 // ExpandRange expands a string like 1-3 to [1,2,3]
