@@ -20,8 +20,8 @@ type Job struct {
 	Var   *JobExpandVar
 }
 
-func (j *Job) Complete() bool {
-	return j.Var == nil || j.Var.Complete()
+func (j *Job) HasNext() bool {
+	return j.Var != nil && j.Var.HasNext()
 }
 
 func (j *Job) Run(s *sync.WaitGroup) {
@@ -50,20 +50,25 @@ func (j *Job) goRun() {
 
 type JobExpandVar struct {
 	Var  string
+	Curr int
 	From int
 	To   int
 	Step int
 }
 
-func (v *JobExpandVar) Complete() bool {
-	return v.From > v.To
+func (v *JobExpandVar) HasNext() bool { return v.Curr <= v.To }
+
+func (v *JobExpandVar) Next() {
+	if v.HasNext() {
+		v.Curr += v.Step
+	} else {
+		v.Curr = v.From
+	}
 }
 
-func (v *JobExpandVar) Value() string {
-	from := v.From
-	v.From += v.Step
-	return strconv.Itoa(from)
-}
+func (v *JobExpandVar) Value() string { return strconv.Itoa(v.Curr) }
+
+func (v *JobExpandVar) Init() { v.Curr = v.From }
 
 func executeJobShell(shellData string) {
 	env, allJobs := parseJobsConfig(shellData)
@@ -77,30 +82,31 @@ func executeJobShell(shellData string) {
 		runJobs(jobs)
 		time.Sleep(interval)
 	}
-
 }
 
 func runJobs(jobs []*Job) {
-	complete := false
-	for !complete {
+	for {
 		var wg sync.WaitGroup
 		for _, job := range jobs {
 			job.Run(&wg)
 		}
 		wg.Wait()
 
-		complete = completeJobs(jobs)
+		if !nextJobs(jobs) {
+			break
+		}
 	}
 }
 
-func completeJobs(jobs []*Job) bool {
-	for _, job := range jobs {
-		if !job.Complete() {
-			return false
+func nextJobs(jobs []*Job) bool {
+	for i := len(jobs) - 1; i >= 0; i-- {
+		job := jobs[i]
+		if job.HasNext() {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 func parseJobsConfig(shellData string) (map[string]string, [][]*Job) {
@@ -151,7 +157,64 @@ func parseShellJob(line string) *Job {
 			To:   ss.ParseInt(vars[2]),
 			Step: ss.ParseInt(vars[3]),
 		}
+		job.Var.Init()
 	}
 
 	return &job
+}
+
+type Iterator interface {
+	HasNext() bool
+	Next()
+	Reset()
+}
+
+func Arrange(sss []Iterator, out chan struct{}, wait chan struct{}) {
+	defer close(out)
+
+	l := len(sss)
+	right := sss[l-1]
+	if l == 1 {
+		rotate(right, out, wait)
+		return
+	}
+
+	leftOut := make(chan struct{})
+	leftWait := make(chan struct{})
+	go Arrange(sss[:l-1], leftOut, leftWait)
+	for range leftOut {
+		rotate(right, out, wait)
+		leftWait <- struct{}{}
+	}
+}
+
+func rotate(iter Iterator, out, wait chan struct{}) {
+	for iter.Reset(); iter.HasNext(); iter.Next() {
+		out <- struct{}{}
+		<-wait
+	}
+}
+
+func Arrangement(sss [][]string) (ret [][]string) {
+	l := len(sss)
+	if l == 0 {
+		return nil
+	} else if l == 1 {
+		for _, li := range sss[0] {
+			ret = append(ret, []string{li})
+		}
+		return ret
+	}
+
+	left := Arrangement(sss[:l-1])
+	right := sss[l-1]
+
+	for _, x := range left {
+		for _, y := range right {
+			reti := append([]string{}, x...)
+			ret = append(ret, append(reti, y))
+		}
+	}
+
+	return ret
 }
