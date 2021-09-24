@@ -70,8 +70,7 @@ func executeJobShell(shellData string) {
 	}
 
 	for _, group := range jobGroups {
-		group.run()
-		time.Sleep(interval)
+		group.run(interval)
 	}
 }
 
@@ -81,13 +80,14 @@ func checkGroup(groups []jobGroup) {
 	}
 }
 
-func (g jobGroup) run() {
+func (g jobGroup) run(interval time.Duration) {
 	if g.VarJobIndex < 0 {
 		var wg sync.WaitGroup
 		for _, job := range g.Jobs {
 			job.Run(&wg)
 		}
 		wg.Wait()
+		time.Sleep(interval)
 		return
 	}
 
@@ -103,6 +103,7 @@ func (g jobGroup) run() {
 		wg.Wait()
 
 		wait <- struct{}{}
+		time.Sleep(interval)
 	}
 }
 
