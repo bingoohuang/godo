@@ -17,11 +17,7 @@ var varRe = regexp.MustCompile(`\{(\d+),(\d+),(\d+)}`)
 
 type Job struct {
 	Shell string
-	Var   *JobExpandVar
-}
-
-func (j *Job) HasNext() bool {
-	return j.Var != nil && j.Var.HasNext()
+	Vars  []Iterator
 }
 
 func (j *Job) Run(s *sync.WaitGroup) {
@@ -34,8 +30,9 @@ func (j *Job) Run(s *sync.WaitGroup) {
 
 func (j *Job) goRun() {
 	shell := j.Shell
-	if j.Var != nil {
-		shell = strings.ReplaceAll(shell, j.Var.Var, j.Var.Value())
+	for _, v := range j.Vars {
+		jv := v.(*JobExpandVar)
+		shell = strings.ReplaceAll(shell, jv.Var, jv.Value())
 	}
 
 	log.Printf("start to run shell %q", shell)
@@ -48,6 +45,8 @@ func (j *Job) goRun() {
 	}
 }
 
+func (j *Job) HasVar() bool { return len(j.Vars) > 0 }
+
 type JobExpandVar struct {
 	Var  string
 	Curr int
@@ -57,69 +56,87 @@ type JobExpandVar struct {
 }
 
 func (v *JobExpandVar) HasNext() bool { return v.Curr <= v.To }
-
-func (v *JobExpandVar) Next() {
-	if v.HasNext() {
-		v.Curr += v.Step
-	} else {
-		v.Curr = v.From
-	}
-}
-
+func (v *JobExpandVar) Next()         { v.Curr += v.Step }
+func (v *JobExpandVar) Reset()        { v.Curr = v.From }
 func (v *JobExpandVar) Value() string { return strconv.Itoa(v.Curr) }
 
-func (v *JobExpandVar) Init() { v.Curr = v.From }
-
 func executeJobShell(shellData string) {
-	env, allJobs := parseJobsConfig(shellData)
+	env, jobGroups := parseJobsConfig(shellData)
+	checkGroup(jobGroups)
 
 	var interval time.Duration
 	if gap := env["gap"]; gap != "" {
 		interval, _ = time.ParseDuration(gap)
 	}
 
-	for _, jobs := range allJobs {
-		runJobs(jobs)
+	for _, group := range jobGroups {
+		group.run()
 		time.Sleep(interval)
 	}
 }
 
-func runJobs(jobs []*Job) {
-	for {
+func checkGroup(groups []jobGroup) {
+	for _, group := range groups {
+		group.Check()
+	}
+}
+
+func (g jobGroup) run() {
+	if g.VarJobIndex < 0 {
 		var wg sync.WaitGroup
-		for _, job := range jobs {
+		for _, job := range g.Jobs {
+			job.Run(&wg)
+		}
+		wg.Wait()
+		return
+	}
+
+	out := make(chan struct{})
+	wait := make(chan struct{})
+	go Arrange(g.Jobs[g.VarJobIndex].Vars, out, wait)
+
+	for range out {
+		var wg sync.WaitGroup
+		for _, job := range g.Jobs {
 			job.Run(&wg)
 		}
 		wg.Wait()
 
-		if !nextJobs(jobs) {
-			break
-		}
+		wait <- struct{}{}
 	}
 }
 
-func nextJobs(jobs []*Job) bool {
-	for i := len(jobs) - 1; i >= 0; i-- {
-		job := jobs[i]
-		if job.HasNext() {
-			return true
+func (g *jobGroup) Check() {
+	g.VarJobIndex = -1
+	count := 0
+	for i, job := range g.Jobs {
+		if job.HasVar() {
+			count++
+			g.VarJobIndex = i
 		}
 	}
 
-	return false
+	if count > 1 {
+		log.Fatalf("there are multiple jobs which has vars, only one for a group")
+	}
 }
 
-func parseJobsConfig(shellData string) (map[string]string, [][]*Job) {
+type jobGroup struct {
+	Jobs        []*Job
+	VarJobIndex int
+}
+
+func parseJobsConfig(shellData string) (map[string]string, []jobGroup) {
 	lines := ss.Split(shellData, ss.WithSeps("\n"), ss.WithTrimSpace(true), ss.WithIgnoreEmpty(true))
-	var allJobs [][]*Job
-	var jobs []*Job
+	var group jobGroup
+	var groups []jobGroup
 	env := map[string]string{}
 	for _, line := range lines {
 		if strings.HasPrefix(line, "###") {
-			if len(jobs) > 0 {
-				allJobs = append(allJobs, jobs)
+			if len(group.Jobs) > 0 {
+				groups = append(groups, group)
 			}
-			jobs = make([]*Job, 0)
+			group.Jobs = make([]*Job, 0)
 			continue
 		}
 
@@ -136,13 +153,14 @@ func parseJobsConfig(shellData string) (map[string]string, [][]*Job) {
 			line = strings.ReplaceAll(line, `${`+k+`}`, v)
 		}
 
-		jobs = append(jobs, parseShellJob(line))
+		group.Jobs = append(group.Jobs, parseShellJob(line))
 	}
 
-	if len(jobs) > 0 {
-		allJobs = append(allJobs, jobs)
+	if len(group.Jobs) > 0 {
+		groups = append(groups, group)
 	}
-	return env, allJobs
+
+	return env, groups
 }
 
 func parseShellJob(line string) *Job {
@@ -150,14 +168,15 @@ func parseShellJob(line string) *Job {
 		Shell: line,
 	}
 
-	if vars := varRe.FindStringSubmatch(line); len(vars) > 0 {
-		job.Var = &JobExpandVar{
-			Var:  vars[0],
-			From: ss.ParseInt(vars[1]),
-			To:   ss.ParseInt(vars[2]),
-			Step: ss.ParseInt(vars[3]),
+	for _, sub := range varRe.FindAllStringSubmatch(line, -1) {
+		v := &JobExpandVar{
+			Var:  sub[0],
+			From: ss.ParseInt(sub[1]),
+			To:   ss.ParseInt(sub[2]),
+			Step: ss.ParseInt(sub[3]),
 		}
-		job.Var.Init()
+		v.Reset()
+		job.Vars = append(job.Vars, v)
 	}
 
 	return &job
@@ -195,20 +214,25 @@ func rotate(iter Iterator, out, wait chan struct{}) {
 	}
 }
 
+// Arrangement 给出 n 维状态的组合列表.
+// sss [n][m], 为 n 维状态，每维有 m 个状态
+// e.g.  {{"红","黄","蓝"},{"方","圆"}}
+// Arrangement 将返回：{{"红","方"},{"红","圆"}, {"黄","方"},{"黄","圆"}, {"蓝","方"}{"蓝","圆"}}，共6种组合状态
 func Arrangement(sss [][]string) (ret [][]string) {
-	l := len(sss)
-	if l == 0 {
+	n := len(sss)
+	if n == 0 { // 0 维，0 种组合状态
 		return nil
-	} else if l == 1 {
+	} else if n == 1 { // 1 维， m 种组合状态，递归终止条件
 		for _, li := range sss[0] {
 			ret = append(ret, []string{li})
 		}
 		return ret
 	}
 
-	left := Arrangement(sss[:l-1])
-	right := sss[l-1]
+	left := Arrangement(sss[:n-1]) // 取左边 n-1 个维
+	right := sss[n-1]              // 取右边1个维
 
+	// 递归，组合左右 2 个维状态
 	for _, x := range left {
 		for _, y := range right {
 			reti := append([]string{}, x...)
