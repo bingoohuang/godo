@@ -114,12 +114,13 @@ func (a *App) SetupJob() {
 }
 
 func (a *App) executeShell(shell, randNum string) {
-	cmd := exec.Command("sh", "-c", shell)
-	env := make([]string, len(a.env), len(a.env)+1)
-	copy(env, a.env)
+	var env []string
+	env = append(env, os.Environ()...)
+	env = append(env, a.env...)
 	env = append(env, "GODO_NUM="+randNum)
+
+	cmd := exec.Command("sh", "-c", shell)
 	cmd.Env = env
-	log.Printf("cmd.Run env:%v", cmd.Env)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -149,12 +150,13 @@ func (a *App) stopCheck() {
 		return
 	}
 
-	cmd := exec.Command("sh", "-c", a.shell)
-	env := make([]string, len(a.env), len(a.env)+1)
-	copy(env, a.env)
+	var env []string
+	env = append(env, os.Environ()...)
+	env = append(env, a.env...)
 	env = append(env, "GODO_NUM="+a.exitNum)
+
+	cmd := exec.Command("sh", "-c", a.shell)
 	cmd.Env = env
-	log.Printf("cmd.Run env:%v", cmd.Env)
 
 	output, _ := cmd.CombinedOutput()
 	sout := strings.TrimFunc(string(output), unicode.IsSpace)
