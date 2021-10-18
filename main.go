@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 func main() {
@@ -37,9 +38,11 @@ func main() {
 type App struct {
 	think   *thinktime.ThinkTime
 	nums    []string
+	exitNum string
 	shell   string
 	setup   string
 	numsLen uint64
+	env     []string
 }
 
 // ParseFlags parses the command line arguments.
@@ -48,13 +51,22 @@ func (a *App) ParseFlags() {
 	flag.StringVar(&a.setup, "setup", "", "setup num")
 	span := flag.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
 		"or 10s-1m for rand span among the range")
+	exitNum := flag.String("exit", "", `stop script check num value, echo "EXIT" to exit`)
 	nums := flag.String("nums", "1", "numbers range, eg 1-3")
 	flag.StringVar(&a.shell, "shell", "", "shell to invoke")
-
 	flag.Parse()
+
+	for _, arg := range flag.Args() {
+		if name, value, ok := splitNameValue(arg); ok {
+			a.env = append(a.env, name+"="+value)
+		}
+	}
+
+	log.Printf("env: %v", a.env)
 
 	a.parseSpan(*span)
 
+	a.exitNum = *exitNum
 	a.nums = ExpandRange(*nums)
 	a.numsLen = uint64(len(a.nums))
 
@@ -66,6 +78,19 @@ func (a *App) ParseFlags() {
 		log.Fatal("shell required")
 	}
 
+}
+
+func splitNameValue(arg string) (name, value string, ok bool) {
+	pos := strings.IndexAny(arg, "=:")
+	if pos <= 0 {
+		return "", "", false
+	}
+
+	name = strings.TrimSpace(arg[:pos])
+	if pos < len(arg) {
+		value = strings.TrimSpace(arg[pos+1:])
+	}
+	return name, value, true
 }
 
 func (a *App) parseSpan(span string) {
@@ -90,7 +115,11 @@ func (a *App) SetupJob() {
 
 func (a *App) executeShell(shell, randNum string) {
 	cmd := exec.Command("sh", "-c", shell)
-	cmd.Env = []string{"GODO_NUM=" + randNum}
+	env := make([]string, len(a.env), len(a.env)+1)
+	copy(env, a.env)
+	env = append(env, "GODO_NUM="+randNum)
+	cmd.Env = env
+	log.Printf("cmd.Run env:%v", cmd.Env)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -112,6 +141,30 @@ func (a *App) randSpan() {
 	if a.think != nil {
 		a.think.Think(true)
 	}
+	a.stopCheck()
+}
+
+func (a *App) stopCheck() {
+	if a.exitNum == "" {
+		return
+	}
+
+	cmd := exec.Command("sh", "-c", a.shell)
+	env := make([]string, len(a.env), len(a.env)+1)
+	copy(env, a.env)
+	env = append(env, "GODO_NUM="+a.exitNum)
+	cmd.Env = env
+	log.Printf("cmd.Run env:%v", cmd.Env)
+
+	output, _ := cmd.CombinedOutput()
+	sout := strings.TrimFunc(string(output), unicode.IsSpace)
+	if !strings.EqualFold(sout, "exit") {
+		log.Printf("Stop check, got %s, continue", sout)
+		return
+	}
+
+	log.Printf("Stop check, got %s, exiting", sout)
+	os.Exit(0)
 }
 
 // ExpandRange expands a string like 1-3 to [1,2,3]
