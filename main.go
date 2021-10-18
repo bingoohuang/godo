@@ -38,7 +38,6 @@ func main() {
 type App struct {
 	think   *thinktime.ThinkTime
 	nums    []string
-	exitNum string
 	shell   string
 	setup   string
 	numsLen uint64
@@ -51,7 +50,6 @@ func (a *App) ParseFlags() {
 	flag.StringVar(&a.setup, "setup", "", "setup num")
 	span := flag.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
 		"or 10s-1m for rand span among the range")
-	exitNum := flag.String("exit", "", `stop script check num value, echo "EXIT" to exit`)
 	nums := flag.String("nums", "1", "numbers range, eg 1-3")
 	flag.StringVar(&a.shell, "shell", "", "shell to invoke")
 	flag.Parse()
@@ -66,7 +64,6 @@ func (a *App) ParseFlags() {
 
 	a.parseSpan(*span)
 
-	a.exitNum = *exitNum
 	a.nums = ExpandRange(*nums)
 	a.numsLen = uint64(len(a.nums))
 
@@ -146,14 +143,10 @@ func (a *App) randSpan() {
 }
 
 func (a *App) stopCheck() {
-	if a.exitNum == "" {
-		return
-	}
-
 	var env []string
 	env = append(env, os.Environ()...)
 	env = append(env, a.env...)
-	env = append(env, "GODO_NUM="+a.exitNum)
+	env = append(env, "GODO_NUM=exitCheck")
 
 	cmd := exec.Command("sh", "-c", a.shell)
 	cmd.Env = env
