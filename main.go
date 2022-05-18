@@ -2,15 +2,16 @@ package main
 
 import (
 	"bytes"
-	"github.com/bingoohuang/gg/pkg/ctl"
-	"github.com/bingoohuang/gg/pkg/fla9"
-	"github.com/bingoohuang/golog"
 	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/bingoohuang/gg/pkg/ctl"
+	"github.com/bingoohuang/gg/pkg/fla9"
+	"github.com/bingoohuang/golog"
 
 	"github.com/bingoohuang/gg/pkg/randx"
 	"github.com/bingoohuang/gg/pkg/thinktime"
@@ -124,12 +125,13 @@ func (a *App) executeShell(shell, randNum string) {
 
 	cmd := exec.Command("sh", "-c", shell)
 	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	output, _ := cmd.CombinedOutput()
+	sout := strings.TrimFunc(string(output), unicode.IsSpace)
 
 	if err := cmd.Run(); err != nil {
 		log.Printf("cmd.Run %s failed with %s", shell, err)
 	}
+	log.Printf("[PRE] Do job, got %s", sout)
 }
 
 // LoopJob loop job in an infinite loop.
@@ -160,11 +162,11 @@ func (a *App) stopCheck() {
 	output, _ := cmd.CombinedOutput()
 	sout := strings.TrimFunc(string(output), unicode.IsSpace)
 	if !strings.EqualFold(sout, "exit") {
-		log.Printf("Stop check, got %s, continue", sout)
+		log.Printf("[PRE] Stop check, got %s, continue", sout)
 		return
 	}
 
-	log.Printf("Stop check, got %s, exiting", sout)
+	log.Printf("[PRE] Stop check, got %s, exiting", sout)
 	os.Exit(0)
 }
 
