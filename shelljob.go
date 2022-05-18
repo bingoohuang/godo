@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/bingoohuang/gg/pkg/ss"
 	"log"
 	"os"
 	"os/exec"
@@ -10,10 +9,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/bingoohuang/gg/pkg/ss"
 )
 
-var envRe = regexp.MustCompile(`(?i)^export\s+([\w\d_-]+)=`)
-var varRe = regexp.MustCompile(`\{(\d+),(\d+),(\d+)}`)
+var (
+	envRe = regexp.MustCompile(`(?i)^export\s+([\w\d_-]+)=`)
+	varRe = regexp.MustCompile(`\{(\d+),(\d+),(\d+)}`)
+)
 
 type Job struct {
 	Shell string

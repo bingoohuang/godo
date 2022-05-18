@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/go-playground/assert/v2"
 	"math/rand"
 	"testing"
+
+	"github.com/go-playground/assert/v2"
 )
 
 type ArrayIter struct {

@@ -2,15 +2,18 @@ package main
 
 import (
 	"bytes"
-	"flag"
-	"github.com/bingoohuang/gg/pkg/randx"
-	"github.com/bingoohuang/gg/pkg/thinktime"
+	"github.com/bingoohuang/gg/pkg/ctl"
+	"github.com/bingoohuang/gg/pkg/fla9"
+	"github.com/bingoohuang/golog"
 	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/bingoohuang/gg/pkg/randx"
+	"github.com/bingoohuang/gg/pkg/thinktime"
 )
 
 func main() {
@@ -46,15 +49,19 @@ type App struct {
 
 // ParseFlags parses the command line arguments.
 func (a *App) ParseFlags() {
-
-	flag.StringVar(&a.setup, "setup", "", "setup num")
-	span := flag.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
+	pInit := fla9.Bool("init", false, "Create initial ctl and exit")
+	pVersion := fla9.Bool("version,v", false, "Create initial ctl and exit")
+	fla9.StringVar(&a.setup, "setup", "", "setup num")
+	span := fla9.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
 		"or 10s-1m for rand span among the range")
-	nums := flag.String("nums", "1", "numbers range, eg 1-3")
-	flag.StringVar(&a.shell, "shell", "", "shell to invoke")
-	flag.Parse()
+	nums := fla9.String("nums", "1", "numbers range, eg 1-3")
+	fla9.StringVar(&a.shell, "shell", "", "shell to invoke")
+	fla9.Parse()
 
-	for _, arg := range flag.Args() {
+	ctl.Config{Initing: *pInit, PrintVersion: *pVersion}.ProcessInit()
+	golog.Setup()
+
+	for _, arg := range fla9.Args() {
 		if name, value, ok := splitNameValue(arg); ok {
 			a.env = append(a.env, name+"="+value)
 		}
@@ -74,7 +81,6 @@ func (a *App) ParseFlags() {
 	if a.shell == "" {
 		log.Fatal("shell required")
 	}
-
 }
 
 func splitNameValue(arg string) (name, value string, ok bool) {
