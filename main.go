@@ -11,10 +11,9 @@ import (
 
 	"github.com/bingoohuang/gg/pkg/ctl"
 	"github.com/bingoohuang/gg/pkg/fla9"
-	"github.com/bingoohuang/golog"
-
 	"github.com/bingoohuang/gg/pkg/randx"
 	"github.com/bingoohuang/gg/pkg/thinktime"
+	"github.com/bingoohuang/golog"
 )
 
 func main() {

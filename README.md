@@ -5,14 +5,13 @@ call shell and sleep in go-routine in an infinite loop.
 ```bash
 $ godo -h
 Usage of godo:
-  -nums string
-    	numbers range, eg 1-3 (default "1")
-  -setup string
-    	setup num
-  -shell string
-    	shell to invoke
-  -span string
-    	time span to do sth, eg. 1h, 10m for fixed span, or 10s-1m for rand span among the range (default "10m")
+  -fla9 string  Flags config file, a scaffold one will created when it does not exist.
+  -init Create initial ctl and exit
+  -nums string  numbers range, eg 1-3 (default "1")
+  -setup string setup num
+  -shell string shell to invoke
+  -span string  time span to do sth, eg. 1h, 10m for fixed span, or 10s-1m for rand span among the range (default "10m")
+  -version (-v) Create initial ctl and exit
 ```
 
 shell demo, demo.sh
