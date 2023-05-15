@@ -128,13 +128,14 @@ func (a *App) executeShell(shell, randNum string) {
 
 	cmd := exec.Command("sh", "-c", shell)
 	cmd.Env = env
-	output, _ := cmd.CombinedOutput()
-	sout := strings.TrimFunc(string(output), unicode.IsSpace)
+	output, err := cmd.CombinedOutput()
 
-	if err := cmd.Run(); err != nil {
-		log.Printf("cmd.Run %s failed with %s", shell, err)
+	if err != nil {
+		log.Printf("cmd.Run %s: %v", shell, err)
+	} else {
+		sout := strings.TrimFunc(string(output), unicode.IsSpace)
+		log.Printf("[PRE]Do job, got %s", sout)
 	}
-	log.Printf("[PRE] Do job, got %s", sout)
 }
 
 // LoopJob loop job in an infinite loop.
