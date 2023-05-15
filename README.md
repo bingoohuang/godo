@@ -39,7 +39,7 @@ fi
 call demo.sh :
 
 ```bash
-nohup godo -shell ./demo.sh -setup 0  -span 10s-1m -nums 1-5  2>&1 >> godo.out &
+godo -shell ./demo.sh -setup 0  -span 10s-1m -nums 1-5  -d
 ```
 
 ```sh

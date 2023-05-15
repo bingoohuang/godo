@@ -13,6 +13,7 @@ import (
 	"github.com/bingoohuang/gg/pkg/fla9"
 	"github.com/bingoohuang/gg/pkg/randx"
 	"github.com/bingoohuang/gg/pkg/thinktime"
+	"github.com/bingoohuang/godaemon"
 	"github.com/bingoohuang/golog"
 )
 
@@ -40,17 +41,18 @@ func main() {
 // App structures the godo application.
 type App struct {
 	think   *thinktime.ThinkTime
-	nums    []string
 	shell   string
 	setup   string
-	numsLen uint64
+	nums    []string
 	env     []string
+	numsLen uint64
 }
 
 // ParseFlags parses the command line arguments.
 func (a *App) ParseFlags() {
 	pInit := fla9.Bool("init", false, "Create initial ctl and exit")
 	pVersion := fla9.Bool("version,v", false, "Create initial ctl and exit")
+	pDeamon := fla9.Bool("Deamon,d", false, "Run in daemonize mode")
 	fla9.StringVar(&a.setup, "setup", "", "setup num")
 	span := fla9.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
 		"or 10s-1m for rand span among the range")
@@ -60,6 +62,8 @@ func (a *App) ParseFlags() {
 
 	ctl.Config{Initing: *pInit, PrintVersion: *pVersion}.ProcessInit()
 	golog.Setup()
+
+	godaemon.Daemonize(godaemon.WithDaemon(*pDeamon))
 
 	for _, arg := range fla9.Args() {
 		if name, value, ok := splitNameValue(arg); ok {
