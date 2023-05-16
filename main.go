@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/bingoohuang/gg/pkg/ctl"
@@ -24,9 +25,31 @@ func main() {
 
 	app.ParseFlags()
 
-	data, err := os.ReadFile(app.shell)
+	var wg sync.WaitGroup
+	if app.shell != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			app.runShell()
+		}()
+	}
+
+	if app.conf != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			app.runConf()
+		}()
+	}
+
+	wg.Wait()
+}
+
+func (a *App) runShell() {
+	data, err := os.ReadFile(a.shell)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("read shell %s: %v", a.shell, err)
+		return
 	}
 
 	if bytes.HasPrefix(data, []byte("###")) {
@@ -34,14 +57,16 @@ func main() {
 		return
 	}
 
-	app.SetupJob()
-	app.LoopJob()
+	a.SetupJob()
+	a.LoopJob()
+	return
 }
 
 // App structures the godo application.
 type App struct {
 	think   *thinktime.ThinkTime
 	shell   string
+	conf    string
 	setup   string
 	nums    []string
 	env     []string
@@ -52,12 +77,13 @@ type App struct {
 func (a *App) ParseFlags() {
 	pInit := fla9.Bool("init", false, "Create initial ctl and exit")
 	pVersion := fla9.Bool("version,v", false, "Create initial ctl and exit")
-	pDeamon := fla9.Bool("Deamon,d", false, "Run in daemonize mode")
+	pDeamon := fla9.Bool("deamon,d", false, "Run in daemonize mode")
 	fla9.StringVar(&a.setup, "setup", "", "setup num")
-	span := fla9.String("span", "10m", "time span to do sth, eg. 1h, 10m for fixed span, "+
+	span := fla9.String("span", "10s", "time span to do sth, eg. 1h, 10m for fixed span, "+
 		"or 10s-1m for rand span among the range")
 	nums := fla9.String("nums", "1", "numbers range, eg 1-3")
 	fla9.StringVar(&a.shell, "shell", "", "shell to invoke")
+	fla9.StringVar(&a.conf, "conf,c", "", "yaml")
 	fla9.Parse()
 
 	ctl.Config{Initing: *pInit, PrintVersion: *pVersion}.ProcessInit()
@@ -82,8 +108,8 @@ func (a *App) ParseFlags() {
 		log.Fatal("nums", nums, "is illegal")
 	}
 
-	if a.shell == "" {
-		log.Fatal("shell required")
+	if a.shell == "" && a.conf == "" {
+		log.Fatal("shell/conf required")
 	}
 }
 
@@ -172,6 +198,16 @@ func (a *App) stopCheck() {
 
 	log.Printf("[PRE] Stop check, got %s, exiting", sout)
 	os.Exit(0)
+}
+
+func (a *App) runConf() {
+	conf, err := ParseConf(a.conf)
+	if err != nil {
+		log.Printf("parse %s: %v", a.conf, err)
+		return
+	}
+
+	conf.Run()
 }
 
 // ExpandRange expands a string like 1-3 to [1,2,3]

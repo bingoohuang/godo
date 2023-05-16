@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	envRe = regexp.MustCompile(`(?i)^export\s+([\w\d_-]+)=`)
+	envRe = regexp.MustCompile(`(?i)^export\s+([\w_-]+)=`)
 	varRe = regexp.MustCompile(`\{(\d+),(\d+),(\d+)}`)
 )
 

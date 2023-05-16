@@ -7,6 +7,8 @@ require (
 	github.com/bingoohuang/godaemon v0.0.0-20230515002958-a85d9e62f472
 	github.com/bingoohuang/golog v0.0.0-20230419014218-5f573ce65b7f
 	github.com/go-playground/assert/v2 v2.2.0
+	github.com/rjeczalik/notify v0.9.3
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
